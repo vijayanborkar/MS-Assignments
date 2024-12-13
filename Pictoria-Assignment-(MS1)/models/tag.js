@@ -1,12 +1,24 @@
-const { DataTypes } = require("sequelize");
-const sequelize = require("../config/database");
+module.exports = (sequelize, DataTypes) => {
+  const tag = sequelize.define(
+    "tag",
+    {
+      name: {
+        type: DataTypes.STRING,
+        allowNull: false,
+      },
+      photoId: {
+        type: DataTypes.INTEGER,
+        references: {
+          model: "photos",
+          key: "id",
+        },
+        onDelete: "CASCADE",
+      },
+    },
+    {
+      timestamps: true,
+    }
+  );
 
-const tag = sequelize.define("tag", {
-  name: DataTypes.STRING,
-  photoId: {
-    type: DataTypes.INTEGER,
-    references: { model: "photos", key: "id" },
-  },
-});
-
-module.exports = tag;
+  return tag;
+};
