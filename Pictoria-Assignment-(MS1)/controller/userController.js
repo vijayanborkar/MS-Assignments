@@ -4,8 +4,14 @@ const {
   validateUniqueEmail,
   validateImageUrl,
   validateTags,
+  validateTagsArray,
+  validateTagCount,
 } = require("../validations/userValidations.js");
-const { user: userModel } = require("../models");
+const {
+  user: userModel,
+  photo: photoModel,
+  tag: tagModel,
+} = require("../models");
 const { doesUserExist } = require("../services/userService.js");
 
 const validateNewUser = async (req, res, next) => {
@@ -62,8 +68,35 @@ const validatePhotoData = (req, res, next) => {
   next();
 };
 
+const validateAddTags = async (req, res, next) => {
+  const { tags } = req.body;
+
+  const tagsArrayError = validateTagsArray(tags);
+  if (tagsArrayError) {
+    return res.status(400).json({ message: tagsArrayError });
+  }
+
+  const photoId = req.params.photoId;
+  const photo = await photoModel.findByPk(photoId);
+
+  if (!photo) {
+    return res.status(404).json({ message: "Photo not found." });
+  }
+
+  const existingTags = await tagModel.findAll({ where: { photoId } });
+  const tagCountError = validateTagCount(existingTags, tags);
+  if (tagCountError) {
+    return res.status(400).json({ message: tagCountError });
+  }
+
+  req.photo = photo;
+  req.existingTags = existingTags;
+  next();
+};
+
 module.exports = {
   validateNewUser,
   validateUnsplashRequest,
   validatePhotoData,
+  validateAddTags,
 };

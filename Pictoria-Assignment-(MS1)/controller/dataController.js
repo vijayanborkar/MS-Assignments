@@ -64,8 +64,31 @@ const savePhoto = async (req, res) => {
   }
 };
 
+const addTagsToPhoto = async (req, res) => {
+  try {
+    const { tags } = req.body;
+    const photo = req.photo;
+
+    for (const tagName of tags) {
+      await tagModel.create({
+        name: tagName,
+        photoId: photo.id,
+      });
+    }
+
+    res.status(200).json({
+      message: "Tags added successfully",
+      photo,
+    });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ error: "Failed to add tags to photo." });
+  }
+};
+
 module.exports = {
   createNewUser,
   getPhotosFromUnsplash,
   savePhoto,
+  addTagsToPhoto,
 };

@@ -35,9 +35,31 @@ const validateTags = (tags) => {
   }
   for (const tag of tags) {
     if (tag.length > 20) {
-      return `Tag ${tag} is too long. Maximum length is 20 characters.`;
+      return `Tag "${tag}" is too long. Maximum length is 20 characters.`;
     }
   }
+  return null;
+};
+
+const validateTagsArray = (tags) => {
+  if (!Array.isArray(tags)) {
+    return "Tags must be an array.";
+  }
+
+  for (const tag of tags) {
+    if (typeof tag !== "string" || tag.trim() === "") {
+      return "Tags must be non-empty strings.";
+    }
+  }
+
+  return null;
+};
+
+const validateTagCount = (existingTags, newTags) => {
+  if (existingTags.length + newTags.length > 5) {
+    return "A photo can have no more than 5 tags in total.";
+  }
+
   return null;
 };
 
@@ -47,4 +69,6 @@ module.exports = {
   validateUniqueEmail,
   validateImageUrl,
   validateTags,
+  validateTagsArray,
+  validateTagCount,
 };

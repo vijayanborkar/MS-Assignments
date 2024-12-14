@@ -5,11 +5,13 @@ const {
   validateNewUser,
   validateUnsplashRequest,
   validatePhotoData,
+  validateAddTags,
 } = require("./controller/userController");
 const {
   createNewUser,
   getPhotosFromUnsplash,
   savePhoto,
+  addTagsToPhoto,
 } = require("./controller/dataController");
 const { sequelize } = require("./models");
 
@@ -21,6 +23,7 @@ app.use(cors());
 app.post("/api/users", validateNewUser, createNewUser);
 app.get("/api/photos/search", validateUnsplashRequest, getPhotosFromUnsplash);
 app.post("/api/photos", validatePhotoData, savePhoto);
+app.post("/api/photos/:photoId/tags", validateAddTags, addTagsToPhoto);
 
 sequelize
   .authenticate()
