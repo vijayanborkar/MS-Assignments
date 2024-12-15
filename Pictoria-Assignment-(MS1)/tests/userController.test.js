@@ -67,7 +67,7 @@ describe("Unit Tests", () => {
         ];
         const mockPhotoTags = [{ name: "nature" }];
 
-        tagModel.findAll.mockResolvedValueOnce(mockTagEntries); // Use mockResolvedValueOnce for sequential calls
+        tagModel.findAll.mockResolvedValueOnce(mockTagEntries);
         photoModel.findAll.mockResolvedValueOnce(mockPhotos);
         tagModel.findAll.mockResolvedValueOnce(mockPhotoTags);
 
@@ -190,7 +190,7 @@ describe("Unit Tests", () => {
 });
 
 describe("Integration Tests", () => {
-  describe("GET /api/photos/tag/search", () => {
+  describe("GET /api/photos/:photoId/tags", () => {
     test("should return 200 and photo details when tag is found", async () => {
       const mockTagEntries = [{ photoId: 1 }];
       const mockPhotos = [
@@ -210,8 +210,6 @@ describe("Integration Tests", () => {
       const response = await request(app).get(
         "/api/photos/tag/search?tags=nature&sort=ASC&userId=1"
       );
-
-      console.log(response.body);
 
       expect(response.status).toBe(200);
       expect(response.body.photos).toBeDefined();
