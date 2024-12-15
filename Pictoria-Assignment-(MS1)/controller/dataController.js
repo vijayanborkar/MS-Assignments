@@ -86,9 +86,66 @@ const addTagsToPhoto = async (req, res) => {
   }
 };
 
+const searchPhotosByTag = async (req, res) => {
+  try {
+    const { tag, sortOrder } = req;
+
+    const tagEntries = await tagModel.findAll({ where: { name: tag } });
+
+    if (!Array.isArray(tagEntries) || tagEntries.length === 0) {
+      return res.status(404).json({ message: "Tag not found." });
+    }
+
+    const photoIds = tagEntries.map((tagEntry) => tagEntry.photoId);
+
+    const photos = await photoModel.findAll({
+      where: { id: photoIds },
+      order: [["dateSaved", sortOrder]],
+    });
+
+    const photoDetails = await Promise.all(
+      photos.map(async (photo) => {
+        const photoTags = await tagModel.findAll({
+          where: { photoId: photo.id },
+        });
+        return {
+          imageUrl: photo.imageUrl,
+          description: photo.description,
+          dateSaved: photo.dateSaved,
+          tags: photoTags.map((tag) => tag.name),
+        };
+      })
+    );
+
+    res.status(200).json({ photos: photoDetails });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ error: "Failed to search photos by tag." });
+  }
+};
+
+const getSearchHistory = async (req, res) => {
+  try {
+    const { userId } = req.query;
+
+    const searchHistory = await searchHistoryModel.findAll({
+      where: { userId },
+      attributes: ["query", "timestamp"],
+      order: [["timestamp", "DESC"]],
+    });
+
+    res.status(200).json({ searchHistory });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ error: "Failed to retrieve search history." });
+  }
+};
+
 module.exports = {
   createNewUser,
   getPhotosFromUnsplash,
   savePhoto,
   addTagsToPhoto,
+  searchPhotosByTag,
+  getSearchHistory,
 };

@@ -6,11 +6,15 @@ const {
   validateTags,
   validateTagsArray,
   validateTagCount,
+  validateSortOrder,
+  validateSingleTag,
+  validateUserId,
 } = require("../validations/userValidations.js");
 const {
   user: userModel,
   photo: photoModel,
   tag: tagModel,
+  searchHistory: searchHistoryModel,
 } = require("../models");
 const { doesUserExist } = require("../services/userService.js");
 
@@ -94,9 +98,60 @@ const validateAddTags = async (req, res, next) => {
   next();
 };
 
+const validateSearch = async (req, res, next) => {
+  const { tags, sort, userId } = req.query;
+
+  const tagError = validateSingleTag(tags);
+  if (tagError) {
+    return res.status(400).json({ message: tagError });
+  }
+
+  const sortOrder = sort || "ASC";
+  const sortOrderError = validateSortOrder(sortOrder);
+  if (sortOrderError) {
+    return res.status(400).json({ message: sortOrderError });
+  }
+
+  const tagExists = await tagModel.findOne({ where: { name: tags } });
+  if (!tagExists) {
+    return res.status(404).json({ message: "Tag not found." });
+  }
+
+  if (userId) {
+    const existingHistory = await searchHistoryModel.findOne({
+      where: { userId, query: tags },
+    });
+
+    if (!existingHistory) {
+      await searchHistoryModel.create({
+        userId,
+        query: tags,
+        timestamp: new Date(),
+      });
+    }
+  }
+
+  req.sortOrder = sortOrder;
+  req.tag = tags;
+  next();
+};
+
+const validateUserIdQuery = async (req, res, next) => {
+  const { userId } = req.query;
+
+  const userIdError = validateUserId(userId);
+  if (userIdError) {
+    return res.status(400).json({ message: userIdError });
+  }
+
+  next();
+};
+
 module.exports = {
   validateNewUser,
   validateUnsplashRequest,
   validatePhotoData,
   validateAddTags,
+  validateSearch,
+  validateUserIdQuery,
 };
