@@ -190,7 +190,7 @@ describe("Unit Tests", () => {
 });
 
 describe("Integration Tests", () => {
-  describe("GET /api/photos/:photoId/tags", () => {
+  describe("GET /api/photos/tag/search", () => {
     test("should return 200 and photo details when tag is found", async () => {
       const mockTagEntries = [{ photoId: 1 }];
       const mockPhotos = [
@@ -198,7 +198,7 @@ describe("Integration Tests", () => {
           id: 1,
           imageUrl: "https://example.com/photo.jpg",
           description: "Beautiful nature",
-          dateSaved: new Date(),
+          dateSaved: new Date("2024-12-15T18:04:19.023Z"),
         },
       ];
       const mockPhotoTags = [{ name: "nature" }];
@@ -213,6 +213,14 @@ describe("Integration Tests", () => {
 
       expect(response.status).toBe(200);
       expect(response.body.photos).toBeDefined();
+      expect(response.body.photos[0].imageUrl).toBe(
+        "https://example.com/photo.jpg"
+      );
+      expect(response.body.photos[0].description).toBe("Beautiful nature");
+      expect(response.body.photos[0].dateSaved).toBe(
+        "2024-12-15T18:04:19.023Z"
+      );
+      expect(response.body.photos[0].tags).toContain("nature");
     });
 
     test("should return 404 when tag is not found", async () => {

@@ -5,6 +5,7 @@ const {
   user: userModel,
 } = require("../models");
 const { searchImages } = require("../services/unsplashService");
+const { Op } = require("sequelize");
 
 const createNewUser = async (req, res) => {
   try {
@@ -88,38 +89,58 @@ const addTagsToPhoto = async (req, res) => {
 
 const searchPhotosByTag = async (req, res) => {
   try {
-    const { tag, sortOrder } = req;
+    const { tags, sortOrder } = req.query;
 
-    const tagEntries = await tagModel.findAll({ where: { name: tag } });
+    if (!tags || tags.length === 0) {
+      return res
+        .status(400)
+        .json({ message: "Tags query parameter is required." });
+    }
 
-    if (!Array.isArray(tagEntries) || tagEntries.length === 0) {
+    const tagList = Array.isArray(tags) ? tags : [tags];
+    const validSortOrders = ["ASC", "DESC"];
+    const finalSortOrder = validSortOrders.includes(sortOrder?.toUpperCase())
+      ? sortOrder.toUpperCase()
+      : "ASC";
+
+    const tagEntries = await tagModel.findAll({
+      where: { name: { [Op.in]: tagList } },
+    });
+
+    if (!tagEntries.length) {
       return res.status(404).json({ message: "Tag not found." });
     }
 
     const photoIds = tagEntries.map((tagEntry) => tagEntry.photoId);
 
     const photos = await photoModel.findAll({
-      where: { id: photoIds },
-      order: [["dateSaved", sortOrder]],
+      where: { id: { [Op.in]: photoIds } },
+      order: [["dateSaved", finalSortOrder]],
+      include: [
+        {
+          model: tagModel,
+          as: "tags",
+          attributes: ["name"],
+        },
+      ],
     });
 
-    const photoDetails = await Promise.all(
-      photos.map(async (photo) => {
-        const photoTags = await tagModel.findAll({
-          where: { photoId: photo.id },
-        });
-        return {
-          imageUrl: photo.imageUrl,
-          description: photo.description,
-          dateSaved: photo.dateSaved,
-          tags: photoTags.map((tag) => tag.name),
-        };
-      })
-    );
+    if (!photos.length) {
+      return res
+        .status(404)
+        .json({ message: "No photos found for the given tags." });
+    }
+
+    const photoDetails = photos.map((photo) => ({
+      imageUrl: photo.imageUrl,
+      description: photo.description,
+      dateSaved: photo.dateSaved,
+      tags: photo.tags.map((tag) => tag.name),
+    }));
 
     res.status(200).json({ photos: photoDetails });
   } catch (error) {
-    console.log(error);
+    console.error(error);
     res.status(500).json({ error: "Failed to search photos by tag." });
   }
 };
