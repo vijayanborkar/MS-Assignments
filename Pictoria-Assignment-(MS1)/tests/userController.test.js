@@ -59,8 +59,9 @@ describe("Unit Tests", () => {
         const mockTagEntries = [{ photoId: 1 }];
         const mockPhotos = [
           {
-            id: 1,
-            imageUrl: "https://example.com/photo.jpg",
+            id: 5,
+            imageUrl:
+              "https://images.unsplash.com/photo-1495584816685-4bdbf1b5057e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w2ODUzMDd8MHwxfHNlYXJjaHw4fHxuYXR1cmV8ZW58MHx8fHwxNzM0NDQzNTA2fDA&ixlib=rb-4.0.3&q=80&w=400",
             description: "Beautiful nature",
             dateSaved: new Date(),
           },
@@ -77,7 +78,8 @@ describe("Unit Tests", () => {
         expect(res.json).toHaveBeenCalledWith({
           photos: [
             {
-              imageUrl: "https://example.com/photo.jpg",
+              imageUrl:
+                "https://images.unsplash.com/photo-1495584816685-4bdbf1b5057e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w2ODUzMDd8MHwxfHNlYXJjaHw4fHxuYXR1cmV8ZW58MHx8fHwxNzM0NDQzNTA2fDA&ixlib=rb-4.0.3&q=80&w=400",
               description: "Beautiful nature",
               dateSaved: mockPhotos[0].dateSaved,
               tags: ["nature"],
@@ -195,10 +197,11 @@ describe("Integration Tests", () => {
       const mockTagEntries = [{ photoId: 1 }];
       const mockPhotos = [
         {
-          id: 1,
-          imageUrl: "https://example.com/photo.jpg",
+          id: 5,
+          imageUrl:
+            "https://images.unsplash.com/photo-1495584816685-4bdbf1b5057e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w2ODUzMDd8MHwxfHNlYXJjaHw4fHxuYXR1cmV8ZW58MHx8fHwxNzM0NDQzNTA2fDA&ixlib=rb-4.0.3&q=80&w=400",
           description: "Beautiful nature",
-          dateSaved: new Date("2024-12-15T18:04:19.023Z"),
+          dateSaved: new Date("2024-12-15T18:04:19.023Z"), // Provide a specific date for consistency
         },
       ];
       const mockPhotoTags = [{ name: "nature" }];
@@ -211,10 +214,12 @@ describe("Integration Tests", () => {
         "/api/photos/tag/search?tags=nature&sort=ASC&userId=1"
       );
 
+      console.log("Response body:", response.body); // Log the response for debugging
+
       expect(response.status).toBe(200);
       expect(response.body.photos).toBeDefined();
       expect(response.body.photos[0].imageUrl).toBe(
-        "https://example.com/photo.jpg"
+        "https://images.unsplash.com/photo-1495584816685-4bdbf1b5057e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w2ODUzMDd8MHwxfHNlYXJjaHw4fHxuYXR1cmV8ZW58MHx8fHwxNzM0NDQzNTA2fDA&ixlib=rb-4.0.3&q=80&w=400"
       );
       expect(response.body.photos[0].description).toBe("Beautiful nature");
       expect(response.body.photos[0].dateSaved).toBe(
@@ -224,6 +229,8 @@ describe("Integration Tests", () => {
     });
 
     test("should return 404 when tag is not found", async () => {
+      tagModel.findAll.mockResolvedValueOnce([]); // Ensure empty array is returned
+
       const response = await request(app).get(
         "/api/photos/tag/search?tags=unknown&sort=ASC&userId=1"
       );
@@ -237,15 +244,29 @@ describe("Integration Tests", () => {
     test("should return 200 and search history for a valid user", async () => {
       const mockSearchHistory = [
         { query: "nature", timestamp: new Date() },
-        { query: "mountains", timestamp: new Date() },
+        { query: "mushroom", timestamp: new Date() },
       ];
 
       searchHistoryModel.findAll.mockResolvedValueOnce(mockSearchHistory);
 
       const response = await request(app).get("/api/search-history?userId=1");
 
+      console.log("Response body:", response.body); // Log the response for debugging
+
       expect(response.status).toBe(200);
       expect(response.body.searchHistory).toBeDefined();
+      expect(response.body.searchHistory).toEqual(mockSearchHistory);
+    });
+
+    test("should return 500 on server error", async () => {
+      searchHistoryModel.findAll.mockRejectedValueOnce(
+        new Error("Database error")
+      );
+
+      const response = await request(app).get("/api/search-history?userId=1");
+
+      expect(response.status).toBe(500);
+      expect(response.body.error).toBe("Failed to retrieve search history.");
     });
 
     test("should return 400 for invalid user ID", async () => {

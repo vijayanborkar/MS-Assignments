@@ -89,58 +89,43 @@ const addTagsToPhoto = async (req, res) => {
 
 const searchPhotosByTag = async (req, res) => {
   try {
-    const { tags, sortOrder } = req.query;
+    const { tags, sortOrder } = req.query; // Correctly using req.query
 
-    if (!tags || tags.length === 0) {
-      return res
-        .status(400)
-        .json({ message: "Tags query parameter is required." });
-    }
+    console.log("Received query params:", req.query); // Log query params
 
-    const tagList = Array.isArray(tags) ? tags : [tags];
-    const validSortOrders = ["ASC", "DESC"];
-    const finalSortOrder = validSortOrders.includes(sortOrder?.toUpperCase())
-      ? sortOrder.toUpperCase()
-      : "ASC";
+    const tagEntries = await tagModel.findAll({ where: { name: tags } });
+    console.log("Tag entries found:", tagEntries); // Log tag entries
 
-    const tagEntries = await tagModel.findAll({
-      where: { name: { [Op.in]: tagList } },
-    });
-
-    if (!tagEntries.length) {
+    if (!Array.isArray(tagEntries) || tagEntries.length === 0) {
       return res.status(404).json({ message: "Tag not found." });
     }
 
     const photoIds = tagEntries.map((tagEntry) => tagEntry.photoId);
+    console.log("Photo IDs found:", photoIds); // Log photo IDs
 
     const photos = await photoModel.findAll({
-      where: { id: { [Op.in]: photoIds } },
-      order: [["dateSaved", finalSortOrder]],
-      include: [
-        {
-          model: tagModel,
-          as: "tags",
-          attributes: ["name"],
-        },
-      ],
+      where: { id: photoIds },
+      order: [["dateSaved", sortOrder]],
     });
+    console.log("Photos found:", photos); // Log photos
 
-    if (!photos.length) {
-      return res
-        .status(404)
-        .json({ message: "No photos found for the given tags." });
-    }
-
-    const photoDetails = photos.map((photo) => ({
-      imageUrl: photo.imageUrl,
-      description: photo.description,
-      dateSaved: photo.dateSaved,
-      tags: photo.tags.map((tag) => tag.name),
-    }));
+    const photoDetails = await Promise.all(
+      photos.map(async (photo) => {
+        const photoTags = await tagModel.findAll({
+          where: { photoId: photo.id },
+        });
+        return {
+          imageUrl: photo.imageUrl,
+          description: photo.description,
+          dateSaved: photo.dateSaved,
+          tags: photoTags.map((tag) => tag.name),
+        };
+      })
+    );
 
     res.status(200).json({ photos: photoDetails });
   } catch (error) {
-    console.error(error);
+    console.error("Error in searchPhotosByTag:", error); // Log error
     res.status(500).json({ error: "Failed to search photos by tag." });
   }
 };
