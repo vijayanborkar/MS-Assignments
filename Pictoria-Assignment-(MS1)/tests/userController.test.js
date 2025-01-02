@@ -20,7 +20,21 @@ const {
   validateUserId,
 } = require("../validations/userValidations");
 
-jest.mock("../models");
+jest.mock("axios");
+jest.mock("../models", () => ({
+  photo: {
+    findAll: jest.fn(),
+    create: jest.fn(),
+  },
+  tag: {
+    findAll: jest.fn(),
+    create: jest.fn(),
+  },
+  searchHistory: {
+    findAll: jest.fn(),
+    create: jest.fn(),
+  },
+}));
 
 const app = express();
 app.use(express.json());
@@ -42,28 +56,16 @@ describe("Unit Tests", () => {
 
   describe("Controller Functions", () => {
     describe("searchPhotosByTag", () => {
-      let req, res;
-
-      beforeEach(() => {
-        req = {
-          tag: "nature",
-          sortOrder: "ASC",
-        };
-        res = {
-          status: jest.fn(() => res),
-          json: jest.fn(),
-        };
-      });
-
-      test("should return 200 and photo details when tag is found", async () => {
-        const mockTagEntries = [{ photoId: 1 }];
+      test("should return 200 and photo details when photos are found", async () => {
+        const mockTagEntries = [{ photoId: 5 }];
         const mockPhotos = [
           {
             id: 5,
             imageUrl:
               "https://images.unsplash.com/photo-1495584816685-4bdbf1b5057e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w2ODUzMDd8MHwxfHNlYXJjaHw4fHxuYXR1cmV8ZW58MHx8fHwxNzM0NDQzNTA2fDA&ixlib=rb-4.0.3&q=80&w=400",
             description: "Beautiful nature",
-            dateSaved: new Date(),
+            altDescription: "Mountain view",
+            dateSaved: "2024-12-17T13:52:41.267Z",
           },
         ];
         const mockPhotoTags = [{ name: "nature" }];
@@ -72,81 +74,90 @@ describe("Unit Tests", () => {
         photoModel.findAll.mockResolvedValueOnce(mockPhotos);
         tagModel.findAll.mockResolvedValueOnce(mockPhotoTags);
 
-        await searchPhotosByTag(req, res);
+        const response = await request(app).get(
+          "/api/photos/tag/search?tags=nature&sort=ASC&userId=1"
+        );
 
-        expect(res.status).toHaveBeenCalledWith(200);
-        expect(res.json).toHaveBeenCalledWith({
-          photos: [
-            {
-              imageUrl:
-                "https://images.unsplash.com/photo-1495584816685-4bdbf1b5057e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w2ODUzMDd8MHwxfHNlYXJjaHw4fHxuYXR1cmV8ZW58MHx8fHwxNzM0NDQzNTA2fDA&ixlib=rb-4.0.3&q=80&w=400",
-              description: "Beautiful nature",
-              dateSaved: mockPhotos[0].dateSaved,
-              tags: ["nature"],
-            },
-          ],
-        });
+        console.log("Test Response Body:", response.body);
+
+        expect(response.status).toBe(200);
+        expect(response.body.photos).toEqual([
+          {
+            imageUrl:
+              "https://images.unsplash.com/photo-1495584816685-4bdbf1b5057e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w2ODUzMDd8MHwxfHNlYXJjaHw4fHxuYXR1cmV8ZW58MHx8fHwxNzM0NDQzNTA2fDA&ixlib=rb-4.0.3&q=80&w=400",
+            description: "Beautiful nature",
+            altDescription: "Mountain view",
+            dateSaved: "2024-12-17T13:52:41.267Z",
+            tags: ["nature"],
+          },
+        ]);
       });
 
       test("should return 404 when tag is not found", async () => {
-        tagModel.findAll.mockResolvedValue([]);
+        tagModel.findAll.mockResolvedValueOnce([]);
 
-        await searchPhotosByTag(req, res);
+        const response = await request(app).get(
+          "/api/photos/tag/search?tags=nonexistent&sort=ASC&userId=1"
+        );
 
-        expect(res.status).toHaveBeenCalledWith(404);
-        expect(res.json).toHaveBeenCalledWith({ message: "Tag not found." });
+        expect(response.status).toBe(404);
+        expect(response.body).toEqual({ error: "Tag not found." });
       });
 
       test("should return 500 on server error", async () => {
-        tagModel.findAll.mockRejectedValue(new Error("Database error"));
+        tagModel.findAll.mockRejectedValueOnce(new Error("Database error"));
+
+        const req = { query: { tags: "nature", sort: "ASC", userId: 1 } };
+        const res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
 
         await searchPhotosByTag(req, res);
 
         expect(res.status).toHaveBeenCalledWith(500);
         expect(res.json).toHaveBeenCalledWith({
           error: "Failed to search photos by tag.",
+          details: undefined,
         });
       });
     });
 
     describe("getSearchHistory", () => {
-      let req, res;
-
-      beforeEach(() => {
-        req = { query: { userId: 1 } };
-        res = {
-          status: jest.fn(() => res),
-          json: jest.fn(),
-        };
-      });
-
       test("should return 200 and search history for a valid user", async () => {
         const mockSearchHistory = [
-          { query: "nature", timestamp: new Date() },
-          { query: "mountains", timestamp: new Date() },
+          { query: "nature", timestamp: new Date().toISOString() },
+          { query: "mushroom", timestamp: new Date().toISOString() },
         ];
 
         searchHistoryModel.findAll.mockResolvedValueOnce(mockSearchHistory);
 
-        await getSearchHistory(req, res);
+        const response = await request(app).get("/api/search-history?userId=1");
 
-        expect(res.status).toHaveBeenCalledWith(200);
-        expect(res.json).toHaveBeenCalledWith({
-          searchHistory: mockSearchHistory,
-        });
+        console.log("Response body:", response.body);
+
+        expect(response.status).toBe(200);
+        expect(response.body.searchHistory).toBeDefined();
+        expect(response.body.searchHistory).toEqual(mockSearchHistory);
       });
 
       test("should return 500 on server error", async () => {
-        searchHistoryModel.findAll.mockRejectedValue(
+        searchHistoryModel.findAll.mockRejectedValueOnce(
           new Error("Database error")
         );
 
-        await getSearchHistory(req, res);
+        const response = await request(app).get("/api/search-history?userId=1");
 
-        expect(res.status).toHaveBeenCalledWith(500);
-        expect(res.json).toHaveBeenCalledWith({
-          error: "Failed to retrieve search history.",
-        });
+        expect(response.status).toBe(500);
+        expect(response.body.error).toBe("Failed to retrieve search history.");
+      });
+
+      test("should return 400 for invalid user ID", async () => {
+        const response = await request(app).get(
+          "/api/search-history?userId=abc"
+        );
+
+        expect(response.status).toBe(400);
+        expect(response.body.message).toBe(
+          "User ID must be a positive integer."
+        );
       });
     });
   });
@@ -168,12 +179,8 @@ describe("Unit Tests", () => {
     });
 
     test("should return an error message for invalid tag", () => {
-      expect(validateSingleTag("")).toBe(
-        "Invalid tag. Tag must be a non-empty string."
-      );
-      expect(validateSingleTag(null)).toBe(
-        "Invalid tag. Tag must be a non-empty string."
-      );
+      expect(validateSingleTag("")).toBe("Tag is required.");
+      expect(validateSingleTag(null)).toBe("Tag is required.");
     });
 
     test("should return null for valid user ID", () => {
@@ -181,101 +188,8 @@ describe("Unit Tests", () => {
     });
 
     test("should return an error message for invalid user ID", () => {
-      expect(validateUserId("abc")).toBe(
-        "Invalid user ID. User ID must be a valid number."
-      );
-      expect(validateUserId(null)).toBe(
-        "Invalid user ID. User ID must be a valid number."
-      );
-    });
-  });
-});
-
-describe("Integration Tests", () => {
-  describe("GET /api/photos/tag/search", () => {
-    test("should return 200 and photo details when tag is found", async () => {
-      const mockTagEntries = [{ photoId: 1 }];
-      const mockPhotos = [
-        {
-          id: 5,
-          imageUrl:
-            "https://images.unsplash.com/photo-1495584816685-4bdbf1b5057e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w2ODUzMDd8MHwxfHNlYXJjaHw4fHxuYXR1cmV8ZW58MHx8fHwxNzM0NDQzNTA2fDA&ixlib=rb-4.0.3&q=80&w=400",
-          description: "Beautiful nature",
-          dateSaved: new Date("2024-12-15T18:04:19.023Z"), // Provide a specific date for consistency
-        },
-      ];
-      const mockPhotoTags = [{ name: "nature" }];
-
-      tagModel.findAll.mockResolvedValueOnce(mockTagEntries);
-      photoModel.findAll.mockResolvedValueOnce(mockPhotos);
-      tagModel.findAll.mockResolvedValueOnce(mockPhotoTags);
-
-      const response = await request(app).get(
-        "/api/photos/tag/search?tags=nature&sort=ASC&userId=1"
-      );
-
-      console.log("Response body:", response.body); // Log the response for debugging
-
-      expect(response.status).toBe(200);
-      expect(response.body.photos).toBeDefined();
-      expect(response.body.photos[0].imageUrl).toBe(
-        "https://images.unsplash.com/photo-1495584816685-4bdbf1b5057e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w2ODUzMDd8MHwxfHNlYXJjaHw4fHxuYXR1cmV8ZW58MHx8fHwxNzM0NDQzNTA2fDA&ixlib=rb-4.0.3&q=80&w=400"
-      );
-      expect(response.body.photos[0].description).toBe("Beautiful nature");
-      expect(response.body.photos[0].dateSaved).toBe(
-        "2024-12-15T18:04:19.023Z"
-      );
-      expect(response.body.photos[0].tags).toContain("nature");
-    });
-
-    test("should return 404 when tag is not found", async () => {
-      tagModel.findAll.mockResolvedValueOnce([]); // Ensure empty array is returned
-
-      const response = await request(app).get(
-        "/api/photos/tag/search?tags=unknown&sort=ASC&userId=1"
-      );
-
-      expect(response.status).toBe(404);
-      expect(response.body.message).toBe("Tag not found.");
-    });
-  });
-
-  describe("GET /api/search-history", () => {
-    test("should return 200 and search history for a valid user", async () => {
-      const mockSearchHistory = [
-        { query: "nature", timestamp: new Date() },
-        { query: "mushroom", timestamp: new Date() },
-      ];
-
-      searchHistoryModel.findAll.mockResolvedValueOnce(mockSearchHistory);
-
-      const response = await request(app).get("/api/search-history?userId=1");
-
-      console.log("Response body:", response.body); // Log the response for debugging
-
-      expect(response.status).toBe(200);
-      expect(response.body.searchHistory).toBeDefined();
-      expect(response.body.searchHistory).toEqual(mockSearchHistory);
-    });
-
-    test("should return 500 on server error", async () => {
-      searchHistoryModel.findAll.mockRejectedValueOnce(
-        new Error("Database error")
-      );
-
-      const response = await request(app).get("/api/search-history?userId=1");
-
-      expect(response.status).toBe(500);
-      expect(response.body.error).toBe("Failed to retrieve search history.");
-    });
-
-    test("should return 400 for invalid user ID", async () => {
-      const response = await request(app).get("/api/search-history?userId=abc");
-
-      expect(response.status).toBe(400);
-      expect(response.body.message).toBe(
-        "Invalid user ID. User ID must be a valid number."
-      );
+      expect(validateUserId("abc")).toBe("User ID must be a positive integer.");
+      expect(validateUserId(null)).toBe("User ID is required.");
     });
   });
 });

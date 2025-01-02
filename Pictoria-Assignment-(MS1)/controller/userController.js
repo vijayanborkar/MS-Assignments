@@ -61,12 +61,12 @@ const validatePhotoData = (req, res, next) => {
 
   const imageUrlError = validateImageUrl(imageUrl);
   if (imageUrlError) {
-    return res.status(400).json({ message: imageUrlError });
+    return res.status(400).json({ error: imageUrlError });
   }
 
   const tagsError = validateTags(tags);
   if (tagsError) {
-    return res.status(400).json({ message: tagsError });
+    return res.status(400).json({ error: tagsError });
   }
 
   next();
@@ -77,20 +77,20 @@ const validateAddTags = async (req, res, next) => {
 
   const tagsArrayError = validateTagsArray(tags);
   if (tagsArrayError) {
-    return res.status(400).json({ message: tagsArrayError });
+    return res.status(400).json({ error: tagsArrayError });
   }
 
   const photoId = req.params.photoId;
   const photo = await photoModel.findByPk(photoId);
 
   if (!photo) {
-    return res.status(404).json({ message: "Photo not found." });
+    return res.status(404).json({ error: "Photo not found." });
   }
 
   const existingTags = await tagModel.findAll({ where: { photoId } });
   const tagCountError = validateTagCount(existingTags, tags);
   if (tagCountError) {
-    return res.status(400).json({ message: tagCountError });
+    return res.status(400).json({ error: tagCountError });
   }
 
   req.photo = photo;
@@ -99,41 +99,53 @@ const validateAddTags = async (req, res, next) => {
 };
 
 const validateSearch = async (req, res, next) => {
-  const { tags, sort, userId } = req.query;
+  try {
+    const { tags, sort, userId } = req.query;
 
-  const tagError = validateSingleTag(tags);
-  if (tagError) {
-    return res.status(400).json({ message: tagError });
-  }
-
-  const sortOrder = sort || "ASC";
-  const sortOrderError = validateSortOrder(sortOrder);
-  if (sortOrderError) {
-    return res.status(400).json({ message: sortOrderError });
-  }
-
-  const tagExists = await tagModel.findOne({ where: { name: tags } });
-  if (!tagExists) {
-    return res.status(404).json({ message: "Tag not found." });
-  }
-
-  if (userId) {
-    const existingHistory = await searchHistoryModel.findOne({
-      where: { userId, query: tags },
-    });
-
-    if (!existingHistory) {
-      await searchHistoryModel.create({
-        userId,
-        query: tags,
-        timestamp: new Date(),
-      });
+    if (!tags) {
+      return res.status(400).json({ error: "Tags are required." });
     }
-  }
 
-  req.sortOrder = sortOrder;
-  req.tag = tags;
-  next();
+    const tagError = validateSingleTag(tags);
+    if (tagError) {
+      return res.status(400).json({ error: tagError });
+    }
+
+    const sortOrder = sort || "ASC";
+    const sortOrderError = validateSortOrder(sortOrder);
+    if (sortOrderError) {
+      return res.status(400).json({ error: sortOrderError });
+    }
+
+    const tagExists = await tagModel.findOne({ where: { name: tags } });
+    if (!tagExists) {
+      return res.status(404).json({ error: "Tag not found." });
+    }
+
+    if (userId) {
+      const userIdError = validateUserId(userId);
+      if (userIdError) {
+        return res.status(400).json({ error: userIdError });
+      }
+
+      const existingHistory = await searchHistoryModel.findOne({
+        where: { userId, query: tags },
+      });
+
+      if (!existingHistory) {
+        await searchHistoryModel.create({
+          userId,
+          query: tags,
+          timestamp: new Date(),
+        });
+      }
+    }
+
+    next();
+  } catch (error) {
+    console.error("Error in validateSearch middleware:", error);
+    res.status(500).json({ error: "Internal server error." });
+  }
 };
 
 const validateUserIdQuery = async (req, res, next) => {
@@ -141,7 +153,7 @@ const validateUserIdQuery = async (req, res, next) => {
 
   const userIdError = validateUserId(userId);
   if (userIdError) {
-    return res.status(400).json({ message: userIdError });
+    return res.status(400).json({ error: userIdError });
   }
 
   next();

@@ -89,31 +89,45 @@ const addTagsToPhoto = async (req, res) => {
 
 const searchPhotosByTag = async (req, res) => {
   try {
-    const { tags, sortOrder } = req.query; // Correctly using req.query
+    const { tags, sortOrder = "ASC", userId } = req.query;
 
-    console.log("Received query params:", req.query); // Log query params
+    console.log("Received query params:", req.query);
 
-    const tagEntries = await tagModel.findAll({ where: { name: tags } });
-    console.log("Tag entries found:", tagEntries); // Log tag entries
-
-    if (!Array.isArray(tagEntries) || tagEntries.length === 0) {
-      return res.status(404).json({ message: "Tag not found." });
+    // Validate the tag parameter exists
+    if (!tags) {
+      return res.status(400).json({ error: "Tag parameter is required." }); // Changed to { error: ... }
     }
 
-    const photoIds = tagEntries.map((tagEntry) => tagEntry.photoId);
-    console.log("Photo IDs found:", photoIds); // Log photo IDs
+    // Find tag entries
+    const tagEntries = await tagModel.findAll({
+      where: { name: tags },
+    });
+    console.log("Tag entries found:", tagEntries);
 
+    // If no tags found, return early
+    if (!tagEntries.length) {
+      return res.status(404).json({ error: "Tag not found." }); // Changed to { error: ... }
+    }
+
+    // Get photo IDs
+    const photoIds = tagEntries.map((tagEntry) => tagEntry.photoId);
+    console.log("Photo IDs found:", photoIds);
+
+    // Find photos
     const photos = await photoModel.findAll({
       where: { id: photoIds },
       order: [["dateSaved", sortOrder]],
     });
-    console.log("Photos found:", photos); // Log photos
+    console.log("Photos found:", photos);
 
+    // Get photo details with tags
     const photoDetails = await Promise.all(
       photos.map(async (photo) => {
         const photoTags = await tagModel.findAll({
           where: { photoId: photo.id },
+          attributes: ["name"], // Only get the name field
         });
+
         return {
           imageUrl: photo.imageUrl,
           description: photo.description,
@@ -123,10 +137,34 @@ const searchPhotosByTag = async (req, res) => {
       })
     );
 
-    res.status(200).json({ photos: photoDetails });
+    console.log("Photo details:", photoDetails);
+
+    // Store search in history if userId provided
+    if (userId) {
+      try {
+        await searchHistoryModel.create({
+          userId,
+          query: tags,
+          timestamp: new Date(),
+        });
+      } catch (historyError) {
+        console.error("Error saving search history:", historyError);
+        // Don't fail the request if history saving fails
+      }
+    }
+
+    // Return results
+    return res.status(200).json({
+      photos: photoDetails,
+      count: photoDetails.length,
+    });
   } catch (error) {
-    console.error("Error in searchPhotosByTag:", error); // Log error
-    res.status(500).json({ error: "Failed to search photos by tag." });
+    console.error("Error in searchPhotosByTag:", error);
+    return res.status(500).json({
+      error: "Failed to search photos by tag.",
+      details:
+        process.env.NODE_ENV === "development" ? error.message : undefined,
+    });
   }
 };
 
@@ -134,15 +172,28 @@ const getSearchHistory = async (req, res) => {
   try {
     const { userId } = req.query;
 
+    console.log("Received userId query:", userId); // Log userId
+
+    // Validate userId
+    if (!userId || isNaN(Number(userId))) {
+      return res
+        .status(400)
+        .json({ message: "Invalid user ID. User ID must be a valid number." });
+    }
+
     const searchHistory = await searchHistoryModel.findAll({
       where: { userId },
-      attributes: ["query", "timestamp"],
-      order: [["timestamp", "DESC"]],
     });
+
+    console.log("Search history found:", searchHistory); // Log search history
+
+    if (!Array.isArray(searchHistory) || searchHistory.length === 0) {
+      return res.status(404).json({ message: "Search history not found." });
+    }
 
     res.status(200).json({ searchHistory });
   } catch (error) {
-    console.log(error);
+    console.error("Error in getSearchHistory:", error); // Log error
     res.status(500).json({ error: "Failed to retrieve search history." });
   }
 };
