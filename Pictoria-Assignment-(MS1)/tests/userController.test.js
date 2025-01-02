@@ -8,36 +8,48 @@ const {
   searchPhotosByTag,
   getSearchHistory,
 } = require("../controller/dataController");
-const { sequelize } = require("../models");
-const {
-  photo: photoModel,
-  tag: tagModel,
-  searchHistory: searchHistoryModel,
-} = require("../models");
 const {
   validateSortOrder,
   validateSingleTag,
   validateUserId,
 } = require("../validations/userValidations");
 
+// Mock sequelize and models
+jest.mock("../models", () => {
+  const mockSequelize = {
+    authenticate: jest.fn().mockResolvedValue(),
+    close: jest.fn().mockResolvedValue(),
+  };
+
+  return {
+    sequelize: mockSequelize,
+    photo: {
+      findAll: jest.fn(),
+      create: jest.fn(),
+    },
+    tag: {
+      findAll: jest.fn(),
+      create: jest.fn(),
+    },
+    searchHistory: {
+      findAll: jest.fn(),
+      create: jest.fn(),
+    },
+  };
+});
+
+const {
+  sequelize,
+  photo: photoModel,
+  tag: tagModel,
+  searchHistory: searchHistoryModel,
+} = require("../models");
+
 jest.mock("axios");
-jest.mock("../models", () => ({
-  photo: {
-    findAll: jest.fn(),
-    create: jest.fn(),
-  },
-  tag: {
-    findAll: jest.fn(),
-    create: jest.fn(),
-  },
-  searchHistory: {
-    findAll: jest.fn(),
-    create: jest.fn(),
-  },
-}));
 
 const app = express();
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.get("/api/photos/tag/search", validateSearch, searchPhotosByTag);
 app.get("/api/search-history", validateUserIdQuery, getSearchHistory);
 
@@ -57,48 +69,62 @@ describe("Unit Tests", () => {
   describe("Controller Functions", () => {
     describe("searchPhotosByTag", () => {
       test("should return 200 and photo details when photos are found", async () => {
-        const mockTagEntries = [{ photoId: 5 }];
+        const mockTagEntries = [{ photoId: 5, name: "nature" }];
+
         const mockPhotos = [
           {
-            id: 5,
+            id: 11,
             imageUrl:
               "https://images.unsplash.com/photo-1495584816685-4bdbf1b5057e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w2ODUzMDd8MHwxfHNlYXJjaHw4fHxuYXR1cmV8ZW58MHx8fHwxNzM0NDQzNTA2fDA&ixlib=rb-4.0.3&q=80&w=400",
             description: "Beautiful nature",
-            altDescription: "Mountain view",
             dateSaved: "2024-12-17T13:52:41.267Z",
           },
         ];
+
         const mockPhotoTags = [{ name: "nature" }];
 
-        tagModel.findAll.mockResolvedValueOnce(mockTagEntries);
+        tagModel.findAll
+          .mockResolvedValueOnce(mockTagEntries)
+          .mockResolvedValueOnce(mockPhotoTags);
+
         photoModel.findAll.mockResolvedValueOnce(mockPhotos);
-        tagModel.findAll.mockResolvedValueOnce(mockPhotoTags);
+        searchHistoryModel.create.mockResolvedValueOnce({});
 
-        const response = await request(app).get(
-          "/api/photos/tag/search?tags=nature&sort=ASC&userId=1"
-        );
+        const response = await request(app)
+          .get("/api/photos/tag/search")
+          .query({
+            tags: "nature",
+            sortOrder: "ASC",
+            userId: "1",
+          });
 
-        console.log("Test Response Body:", response.body);
+        console.log("Test response:", response.status, response.body);
 
         expect(response.status).toBe(200);
-        expect(response.body.photos).toEqual([
-          {
-            imageUrl:
-              "https://images.unsplash.com/photo-1495584816685-4bdbf1b5057e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w2ODUzMDd8MHwxfHNlYXJjaHw4fHxuYXR1cmV8ZW58MHx8fHwxNzM0NDQzNTA2fDA&ixlib=rb-4.0.3&q=80&w=400",
-            description: "Beautiful nature",
-            altDescription: "Mountain view",
-            dateSaved: "2024-12-17T13:52:41.267Z",
-            tags: ["nature"],
-          },
-        ]);
+        expect(response.body).toEqual({
+          photos: [
+            {
+              imageUrl:
+                "https://images.unsplash.com/photo-1495584816685-4bdbf1b5057e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w2ODUzMDd8MHwxfHNlYXJjaHw4fHxuYXR1cmV8ZW58MHx8fHwxNzM0NDQzNTA2fDA&ixlib=rb-4.0.3&q=80&w=400",
+              description: "Beautiful nature",
+              dateSaved: "2024-12-17T13:52:41.267Z",
+              tags: ["nature"],
+            },
+          ],
+          count: 1,
+        });
       });
 
       test("should return 404 when tag is not found", async () => {
         tagModel.findAll.mockResolvedValueOnce([]);
 
-        const response = await request(app).get(
-          "/api/photos/tag/search?tags=nonexistent&sort=ASC&userId=1"
-        );
+        const response = await request(app)
+          .get("/api/photos/tag/search")
+          .query({
+            tags: "nonexistent",
+            sortOrder: "ASC",
+            userId: "1",
+          });
 
         expect(response.status).toBe(404);
         expect(response.body).toEqual({ error: "Tag not found." });
@@ -107,14 +133,17 @@ describe("Unit Tests", () => {
       test("should return 500 on server error", async () => {
         tagModel.findAll.mockRejectedValueOnce(new Error("Database error"));
 
-        const req = { query: { tags: "nature", sort: "ASC", userId: 1 } };
-        const res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+        const response = await request(app)
+          .get("/api/photos/tag/search")
+          .query({
+            tags: "nature",
+            sortOrder: "ASC",
+            userId: "1",
+          });
 
-        await searchPhotosByTag(req, res);
-
-        expect(res.status).toHaveBeenCalledWith(500);
-        expect(res.json).toHaveBeenCalledWith({
-          error: "Failed to search photos by tag.",
+        expect(response.status).toBe(500);
+        expect(response.body).toEqual({
+          error: "Internal server error.",
           details: undefined,
         });
       });
@@ -130,8 +159,6 @@ describe("Unit Tests", () => {
         searchHistoryModel.findAll.mockResolvedValueOnce(mockSearchHistory);
 
         const response = await request(app).get("/api/search-history?userId=1");
-
-        console.log("Response body:", response.body);
 
         expect(response.status).toBe(200);
         expect(response.body.searchHistory).toBeDefined();
@@ -150,14 +177,14 @@ describe("Unit Tests", () => {
       });
 
       test("should return 400 for invalid user ID", async () => {
-        const response = await request(app).get(
-          "/api/search-history?userId=abc"
-        );
+        const response = await request(app)
+          .get("/api/search-history")
+          .query({ userId: "abc" });
 
         expect(response.status).toBe(400);
-        expect(response.body.message).toBe(
-          "User ID must be a positive integer."
-        );
+        expect(response.body).toEqual({
+          error: "User ID must be a positive integer.",
+        });
       });
     });
   });
