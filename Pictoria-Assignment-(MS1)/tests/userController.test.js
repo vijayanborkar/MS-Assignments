@@ -43,6 +43,7 @@ const {
   photo: photoModel,
   tag: tagModel,
   searchHistory: searchHistoryModel,
+  user: userModel,
 } = require("../models");
 
 jest.mock("axios");
@@ -153,7 +154,10 @@ describe("Unit Tests", () => {
       test("should return 200 and search history for a valid user", async () => {
         const mockSearchHistory = [
           { query: "nature", timestamp: new Date().toISOString() },
-          { query: "mushroom", timestamp: new Date().toISOString() },
+          {
+            query: "mushroom",
+            timestamp: new Date().toISOString(),
+          },
         ];
 
         searchHistoryModel.findAll.mockResolvedValueOnce(mockSearchHistory);

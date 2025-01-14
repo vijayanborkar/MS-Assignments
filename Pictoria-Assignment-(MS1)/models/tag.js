@@ -1,24 +1,15 @@
 module.exports = (sequelize, DataTypes) => {
-  const tag = sequelize.define(
-    "tag",
-    {
-      name: {
-        type: DataTypes.STRING,
-        allowNull: false,
-      },
-      photoId: {
-        type: DataTypes.INTEGER,
-        references: {
-          model: "photos",
-          key: "id",
+    const tag = sequelize.define("tag", {
+        name: {
+            type: DataTypes.STRING, allowNull: false,
+        }, photoId: {
+            type: DataTypes.INTEGER, references: {
+                model: "photo", key: "id",
+            }, onDelete: "CASCADE",
         },
-        onDelete: "CASCADE",
-      },
-    },
-    {
-      timestamps: true,
-    }
-  );
+    }, {
+        timestamps: true,
+    });
 
-  return tag;
+    return tag;
 };
