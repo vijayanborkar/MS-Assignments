@@ -14,7 +14,6 @@ const {
   validateUserId,
 } = require("../validations/userValidations");
 
-// Mock sequelize and models
 jest.mock("../models", () => {
   const mockSequelize = {
     authenticate: jest.fn().mockResolvedValue(),
@@ -29,9 +28,15 @@ jest.mock("../models", () => {
     },
     tag: {
       findAll: jest.fn(),
+      findOne: jest.fn(),
       create: jest.fn(),
     },
     searchHistory: {
+      findAll: jest.fn(),
+      findOne: jest.fn(),
+      create: jest.fn(),
+    },
+    user: {
       findAll: jest.fn(),
       create: jest.fn(),
     },
@@ -54,6 +59,14 @@ app.use(express.urlencoded({ extended: true }));
 app.get("/api/photos/tag/search", validateSearch, searchPhotosByTag);
 app.get("/api/search-history", validateUserIdQuery, getSearchHistory);
 
+app.use((err, req, res, next) => {
+  console.error("Error in middleware:", err);
+  res.status(500).json({
+    error: "Internal server error.",
+    details: process.env.NODE_ENV === "development" ? err.message : undefined,
+  });
+});
+
 beforeAll(async () => {
   await sequelize.authenticate();
 });
@@ -71,18 +84,19 @@ describe("Unit Tests", () => {
     describe("searchPhotosByTag", () => {
       test("should return 200 and photo details when photos are found", async () => {
         const mockTagEntries = [{ photoId: 5, name: "nature" }];
-
         const mockPhotos = [
           {
-            id: 11,
+            id: 5,
             imageUrl:
               "https://images.unsplash.com/photo-1495584816685-4bdbf1b5057e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w2ODUzMDd8MHwxfHNlYXJjaHw4fHxuYXR1cmV8ZW58MHx8fHwxNzM0NDQzNTA2fDA&ixlib=rb-4.0.3&q=80&w=400",
             description: "Beautiful nature",
             dateSaved: "2024-12-17T13:52:41.267Z",
           },
         ];
-
         const mockPhotoTags = [{ name: "nature" }];
+
+        tagModel.findOne.mockResolvedValue({ id: 1, name: "nature" });
+        searchHistoryModel.findOne.mockResolvedValue(null);
 
         tagModel.findAll
           .mockResolvedValueOnce(mockTagEntries)
@@ -99,16 +113,13 @@ describe("Unit Tests", () => {
             userId: "1",
           });
 
-        console.log("Test response:", response.status, response.body);
-
         expect(response.status).toBe(200);
         expect(response.body).toEqual({
           photos: [
             {
-              imageUrl:
-                "https://images.unsplash.com/photo-1495584816685-4bdbf1b5057e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w2ODUzMDd8MHwxfHNlYXJjaHw4fHxuYXR1cmV8ZW58MHx8fHwxNzM0NDQzNTA2fDA&ixlib=rb-4.0.3&q=80&w=400",
-              description: "Beautiful nature",
-              dateSaved: "2024-12-17T13:52:41.267Z",
+              imageUrl: mockPhotos[0].imageUrl,
+              description: mockPhotos[0].description,
+              dateSaved: mockPhotos[0].dateSaved,
               tags: ["nature"],
             },
           ],
@@ -117,7 +128,9 @@ describe("Unit Tests", () => {
       });
 
       test("should return 404 when tag is not found", async () => {
-        tagModel.findAll.mockResolvedValueOnce([]);
+        tagModel.findOne.mockResolvedValue(null);
+        searchHistoryModel.findOne.mockResolvedValue(null);
+        tagModel.findAll.mockResolvedValue([]);
 
         const response = await request(app)
           .get("/api/photos/tag/search")
@@ -132,6 +145,9 @@ describe("Unit Tests", () => {
       });
 
       test("should return 500 on server error", async () => {
+        tagModel.findOne.mockResolvedValue({ id: 1, name: "nature" });
+        searchHistoryModel.findOne.mockResolvedValue(null);
+
         tagModel.findAll.mockRejectedValueOnce(new Error("Database error"));
 
         const response = await request(app)
@@ -144,8 +160,11 @@ describe("Unit Tests", () => {
 
         expect(response.status).toBe(500);
         expect(response.body).toEqual({
-          error: "Internal server error.",
-          details: undefined,
+          error: "Failed to search photos by tag.",
+          details:
+            process.env.NODE_ENV === "development"
+              ? "Database error"
+              : undefined,
         });
       });
     });

@@ -8,11 +8,9 @@ module.exports = (sequelize, DataTypes) => {
       },
       description: {
         type: DataTypes.STRING,
-        allowNull: true,
       },
       altDescription: {
         type: DataTypes.STRING,
-        allowNull: true,
       },
       dateSaved: {
         type: DataTypes.DATE,
@@ -20,12 +18,7 @@ module.exports = (sequelize, DataTypes) => {
       },
       userId: {
         type: DataTypes.INTEGER,
-        allowNull: false,
-        references: {
-          model: "user",
-          key: "id",
-        },
-        onDelete: "CASCADE",
+        references: { model: "user", key: "id" },
       },
     },
     {
@@ -33,5 +26,9 @@ module.exports = (sequelize, DataTypes) => {
     }
   );
 
+  // Associations
+  photo.associate = (models) => {
+    photo.hasMany(models.tag, { foreignKey: "photoId" });
+  };
   return photo;
 };
