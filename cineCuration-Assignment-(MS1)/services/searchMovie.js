@@ -5,8 +5,6 @@ const searchMovie = async (query) => {
   const url = `https://api.themoviedb.org/3/search/movie`;
   const apiKey = process.env.TMDB_API_KEY;
 
-  console.log("Using API key:", apiKey); // Log the API key to verify it's being accessed correctly
-
   try {
     const response = await axios.get(url, {
       params: { query: query },
@@ -28,9 +26,6 @@ const searchMovie = async (query) => {
 const fetchMovieCredits = async (movieId) => {
   const url = `https://api.themoviedb.org/3/movie/${movieId}/credits`;
   const apiKey = process.env.TMDB_API_KEY;
-
-  console.log("Fetching credits for movie ID:", movieId); // Log the movie ID being fetched
-  console.log("Using API key:", apiKey); // Log the API key to verify it's being accessed correctly
 
   try {
     const response = await axios.get(url, {
