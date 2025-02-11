@@ -1,4 +1,4 @@
-const { searchMovie, fetchMovieCredits } = require("../services/searchMovie");
+const { searchMovie, fetchMovieCredits } = require("../services/movieAPI");
 
 const searchMovies = async (req, res) => {
   try {

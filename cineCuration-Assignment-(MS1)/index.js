@@ -3,12 +3,19 @@ const app = express();
 require("dotenv").config();
 const { sequelize } = require("./models");
 
-const { searchMovies } = require("./controllers/movieController");
+// Import Controllers
+const { searchMovies } = require("./controllers/searchMovieController");
+const {
+  createCuratedList,
+  updateCuratedList,
+} = require("./controllers/curatedListController");
 
 app.use(express.json());
 
 // Routes
 app.get("/api/movies/search", searchMovies);
+app.post("/api/curated-lists", createCuratedList);
+app.put("/api/curated-list/:curatedListId", updateCuratedList);
 
 sequelize
   .authenticate()
