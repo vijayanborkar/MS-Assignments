@@ -1,5 +1,6 @@
 require("dotenv").config();
 const axios = require("axios");
+const { movie: movieModel } = require("../models");
 
 const searchMovie = async (query) => {
   const url = `https://api.themoviedb.org/3/search/movie`;
@@ -44,4 +45,34 @@ const fetchMovieCredits = async (movieId) => {
   }
 };
 
-module.exports = { searchMovie, fetchMovieCredits };
+const movieExistsInDB = async (tmdbId) => {
+  const movie = await movieModel.find({ where: { tmdbId } });
+  return !!movie;
+};
+
+const fetchMovieAndCastDetails = async (tmdbId) => {
+  const apiKey = process.env.TMDB_API_KEY;
+
+  const movieResponse = await axios.get(
+    `https://api.themoviedb.org/3/movie/${tmdbId}?api_key=${apiKey}`
+  );
+
+  const castResponse = await axios.get(
+    `https://api.themoviedb.org/3/movie/${tmdbId}/credits?api_key=${apiKey}`
+  );
+
+  const movieDetails = movieResponse.data;
+  const castDetails = castResponse.data.cast.slice(0, 5);
+
+  return {
+    movieDetails,
+    castDetails,
+  };
+};
+
+module.exports = {
+  searchMovie,
+  fetchMovieCredits,
+  movieExistsInDB,
+  fetchMovieAndCastDetails,
+};

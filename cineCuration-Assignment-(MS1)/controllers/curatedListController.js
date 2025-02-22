@@ -1,16 +1,16 @@
-const { curatedList } = require("../models/curatedList");
+const { curatedList: curatedListModel } = require("../models");
 const { generateSlug } = require("../services/slugService");
 
 const createCuratedList = async (req, res) => {
   try {
-    console.log("Request body:", req.body);
-    const { name, description, slug } = req.body;
+    const name = req.body.name?.trim();
+    const description = req.body.description?.trim();
+    const slug = generateSlug(name); // Generate slug from the name
 
     // Enhanced validation
     const validationErrors = [];
     if (!name) validationErrors.push("name");
     if (!description) validationErrors.push("description");
-    if (!slug) validationErrors.push("slug");
 
     if (validationErrors.length > 0) {
       return res.status(400).json({
@@ -19,13 +19,19 @@ const createCuratedList = async (req, res) => {
     }
 
     // Check if slug already exists
-    const existingList = await CuratedList.findOne({
+    const existingList = await curatedListModel.findOne({
       where: { slug },
       attributes: ["id", "slug"],
     });
 
-    // Create new list with error handling
-    const newList = await curatedList.create({
+    if (existingList) {
+      return res.status(409).json({
+        error: "Slug already exists. Please use a unique slug.",
+      });
+    }
+
+    // Create new list
+    const newList = await curatedListModel.create({
       name,
       description,
       slug,
@@ -66,7 +72,7 @@ const updateCuratedList = async (req, res) => {
     const { curatedListId } = req.params;
     const { name, description } = req.body;
 
-    const list = await curatedList.findByPk(curatedListId);
+    const list = await curatedListModel.findByPk(curatedListId);
     if (!list) {
       return res.status(404).json({
         error: "Curated list not found",

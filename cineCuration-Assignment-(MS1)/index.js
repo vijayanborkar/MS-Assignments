@@ -1,21 +1,22 @@
 const express = require("express");
-const app = express();
+const cors = require("cors");
 require("dotenv").config();
-const { sequelize } = require("./models");
-
-// Import Controllers
-const { searchMovies } = require("./controllers/searchMovieController");
 const {
   createCuratedList,
   updateCuratedList,
 } = require("./controllers/curatedListController");
+const { searchMovies } = require("./controllers/searchMovieController");
+const { sequelize } = require("./models");
+
+const app = express();
 
 app.use(express.json());
+app.use(cors());
 
 // Routes
 app.get("/api/movies/search", searchMovies);
 app.post("/api/curated-lists", createCuratedList);
-app.put("/api/curated-list/:curatedListId", updateCuratedList);
+app.put("/api/curated-lists/:curatedListId", updateCuratedList);
 
 sequelize
   .authenticate()
