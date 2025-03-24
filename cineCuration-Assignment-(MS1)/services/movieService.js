@@ -4,7 +4,7 @@ const { movie: movieModel } = require("../models");
 
 const searchMovie = async (query) => {
   const url = `https://api.themoviedb.org/3/search/movie`;
-  const apiKey = process.env.TMDB_API_KEY;
+  const apiKey = process.env.TMDB_API_Read_Access_Token;
 
   try {
     const response = await axios.get(url, {
@@ -26,7 +26,7 @@ const searchMovie = async (query) => {
 
 const fetchMovieCredits = async (movieId) => {
   const url = `https://api.themoviedb.org/3/movie/${movieId}/credits`;
-  const apiKey = process.env.TMDB_API_KEY;
+  const apiKey = process.env.TMDB_API_Read_Access_Token;
 
   try {
     const response = await axios.get(url, {
@@ -46,7 +46,7 @@ const fetchMovieCredits = async (movieId) => {
 };
 
 const movieExistsInDB = async (tmdbId) => {
-  const movie = await movieModel.find({ where: { tmdbId } });
+  const movie = await movieModel.findOne({ where: { tmdbId } });
   return !!movie;
 };
 

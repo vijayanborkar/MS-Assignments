@@ -6,6 +6,11 @@ const {
   updateCuratedList,
 } = require("./controllers/curatedListController");
 const { searchMovies } = require("./controllers/searchMovieController");
+const {
+  addToWatchlist,
+  addToWishlist,
+  addToCuratedList,
+} = require("./controllers/saveMovieController");
 const { sequelize } = require("./models");
 
 const app = express();
@@ -17,6 +22,9 @@ app.use(cors());
 app.get("/api/movies/search", searchMovies);
 app.post("/api/curated-lists", createCuratedList);
 app.put("/api/curated-lists/:curatedListId", updateCuratedList);
+app.post("/api/movies/watchlist", addToWatchlist);
+app.post("/api/movies/wishlist", addToWishlist);
+app.post("/api/movies/curated-list", addToCuratedList);
 
 sequelize
   .authenticate()
