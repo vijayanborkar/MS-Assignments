@@ -46,8 +46,13 @@ const fetchMovieCredits = async (movieId) => {
 };
 
 const movieExistsInDB = async (tmdbId) => {
-  const movie = await movieModel.findOne({ where: { tmdbId } });
-  return !!movie;
+  try {
+    const movie = await movieModel.findOne({ where: { tmdbId } });
+    return movie; // Return the movie object if it exists, or null if not
+  } catch (error) {
+    console.error("Error while checking if movie exists in DB:", error);
+    throw new Error("Database query failed.");
+  }
 };
 
 const fetchMovieAndCastDetails = async (tmdbId) => {
