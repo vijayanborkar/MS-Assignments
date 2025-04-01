@@ -11,6 +11,14 @@ const {
   addToWishlist,
   addToCuratedList,
 } = require("./controllers/saveMovieController");
+const { addReview } = require("./controllers/reviewController");
+const {
+  searchMovieByGenreActorAndDirector,
+} = require("./controllers/searchMovieByGenreActorAndDirectorController");
+const {
+  sortMovies,
+} = require("./controllers/sortByRatingOrReleaseyearController");
+const { getTop5Movies } = require("./controllers/topMoviesController");
 const { sequelize } = require("./models");
 
 const app = express();
@@ -25,6 +33,13 @@ app.put("/api/curated-lists/:curatedListId", updateCuratedList);
 app.post("/api/movies/watchlist", addToWatchlist);
 app.post("/api/movies/wishlist", addToWishlist);
 app.post("/api/movies/curated-list", addToCuratedList);
+app.post("/api/movies/:movieId/reviews", addReview);
+app.get(
+  "/api/movies/searchByGenreAndActor",
+  searchMovieByGenreActorAndDirector
+);
+app.get("/api/movies/sort", sortMovies);
+app.get("/api/movies/top5", getTop5Movies);
 
 sequelize
   .authenticate()

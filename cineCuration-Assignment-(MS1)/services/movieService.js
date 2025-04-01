@@ -15,11 +15,6 @@ const searchMovie = async (query) => {
     return response.data.results;
   } catch (error) {
     console.error("Error fetching data from TMDB API:", error.message);
-    if (error.response) {
-      console.error("Response data:", error.response.data);
-      console.error("Response status:", error.response.status);
-      console.error("Response headers:", error.response.headers);
-    }
     throw new Error("Error fetching data from TMDB API");
   }
 };
@@ -36,11 +31,6 @@ const fetchMovieCredits = async (movieId) => {
     return response.data.cast;
   } catch (error) {
     console.error("Error fetching credits from TMDB API:", error.message);
-    if (error.response) {
-      console.error("Response data:", error.response.data);
-      console.error("Response status:", error.response.status);
-      console.error("Response headers:", error.response.headers);
-    }
     throw new Error("Error fetching credits from TMDB API");
   }
 };
@@ -50,29 +40,29 @@ const movieExistsInDB = async (tmdbId) => {
     const movie = await movieModel.findOne({ where: { tmdbId } });
     return movie; // Return the movie object if it exists, or null if not
   } catch (error) {
-    console.error("Error while checking if movie exists in DB:", error);
+    console.error("Error while checking if movie exists in DB:", error.message);
     throw new Error("Database query failed.");
   }
 };
 
-const fetchMovieAndCastDetails = async (tmdbId) => {
-  const apiKey = process.env.TMDB_API_KEY;
+const fetchMovieAndCastDetails = async (movieId) => {
+  const url = `https://api.themoviedb.org/3/movie/${movieId}?append_to_response=credits`;
 
-  const movieResponse = await axios.get(
-    `https://api.themoviedb.org/3/movie/${tmdbId}?api_key=${apiKey}`
-  );
+  try {
+    const response = await axios.get(url, {
+      headers: {
+        Authorization: `Bearer ${process.env.TMDB_API_Read_Access_Token}`,
+      },
+    });
 
-  const castResponse = await axios.get(
-    `https://api.themoviedb.org/3/movie/${tmdbId}/credits?api_key=${apiKey}`
-  );
-
-  const movieDetails = movieResponse.data;
-  const castDetails = castResponse.data.cast.slice(0, 5);
-
-  return {
-    movieDetails,
-    castDetails,
-  };
+    return {
+      movieDetails: response.data,
+      castDetails: response.data.credits.cast,
+    };
+  } catch (error) {
+    console.error("Failed to fetch movie details from TMDB:", error.message);
+    return null; // Return null to handle errors gracefully
+  }
 };
 
 module.exports = {
