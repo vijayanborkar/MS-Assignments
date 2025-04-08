@@ -4,12 +4,30 @@ const {
   wishlist: wishlistModel,
   curatedListItem: curatedListItemModel,
 } = require("../models");
-const { Op } = require("sequelize"); // Sequelize Operators for filtering
+const { Op } = require("sequelize");
 
 const searchMovieByGenreActorAndDirector = async (req, res) => {
-  const { genre, actor, director, listType } = req.query; // Extract genre, actor, director, and listType from query parameters
+  const { genre, actor, director, listType } = req.query;
 
   try {
+    // Explicitly check for empty parameters
+    if (genre === "") {
+      return res.status(400).json({
+        error: "Invalid genre parameter. Genre must be a non-empty string.",
+      });
+    }
+    if (actor === "") {
+      return res.status(400).json({
+        error: "Invalid actor parameter. Actor must be a non-empty string.",
+      });
+    }
+    if (director === "") {
+      return res.status(400).json({
+        error:
+          "Invalid director parameter. Director must be a non-empty string.",
+      });
+    }
+
     // Validate input parameters
     if (!genre && !actor && !director && !listType) {
       return res
@@ -19,64 +37,42 @@ const searchMovieByGenreActorAndDirector = async (req, res) => {
 
     const validListTypes = ["watchlist", "wishlist", "curatedList"];
     if (listType && !validListTypes.includes(listType)) {
-      return res.status(400).json({ error: "Invalid listType parameter." });
+      return res.status(400).json({
+        error: `Invalid listType parameter. Valid options are: ${validListTypes.join(
+          ", "
+        )}.`,
+      });
     }
 
-    if (genre && typeof genre !== "string") {
-      return res.status(400).json({ error: "Invalid genre parameter." });
-    }
-
-    if (actor && typeof actor !== "string") {
-      return res.status(400).json({ error: "Invalid actor parameter." });
-    }
-
-    if (director && typeof director !== "string") {
-      return res.status(400).json({ error: "Invalid director parameter." });
-    }
-
-    // Initialize dynamic filter conditions
+    // Initialize dynamic filter conditions for movies
     const whereConditions = {};
+    if (genre) whereConditions.genre = { [Op.iLike]: `%${genre.trim()}%` }; // Case-insensitive match
+    if (actor) whereConditions.actors = { [Op.iLike]: `%${actor.trim()}%` };
+    if (director)
+      whereConditions.director = { [Op.iLike]: `%${director.trim()}%` };
 
-    // Add filter by genre if provided
-    if (genre) {
-      whereConditions.genre = { [Op.iLike]: `%${genre.trim()}%` }; // Case-insensitive match
-    }
-
-    // Add filter by actor if provided
-    if (actor) {
-      whereConditions.actors = { [Op.iLike]: `%${actor.trim()}%` }; // Case-insensitive match
-    }
-
-    // Add filter by director if provided
-    if (director) {
-      whereConditions.director = { [Op.iLike]: `%${director.trim()}%` }; // Case-insensitive match
-    }
-
-    // Define the listType model dynamically
-    let listModel;
+    // Determine the listType model dynamically
+    let listModel = null;
     if (listType === "watchlist") listModel = watchlistModel;
     else if (listType === "wishlist") listModel = wishlistModel;
     else if (listType === "curatedList") listModel = curatedListItemModel;
 
-    // Log conditions for debugging
-    console.log("Where Conditions:", whereConditions);
-
-    // Query movies along with the specified listType, if provided
+    // Query movies with conditions and optional listType filter
     const movies = await movieModel.findAll({
       where: whereConditions,
       include: listModel
-        ? [{ model: listModel, attributes: [], required: true }] // Include movies in the specified list only
-        : [], // No list filter if listType is not provided
+        ? [{ model: listModel, attributes: [], required: true }]
+        : [],
     });
 
-    // Format the output
+    // Format the output for movies
     const formattedMovies = movies.map((movie) => ({
       id: movie.id,
       title: movie.title,
       tmdbId: movie.tmdbId,
       genre: movie.genre,
       actors: movie.actors,
-      director: movie.director, // Include director in the response
+      director: movie.director,
       releaseYear: movie.releaseYear,
       rating: movie.rating,
       description: movie.description,
@@ -84,15 +80,15 @@ const searchMovieByGenreActorAndDirector = async (req, res) => {
       updatedAt: movie.updatedAt,
     }));
 
-    // Send the response with formatted movies
-    res.status(200).json(
-      formattedMovies.length > 0
-        ? { movies: formattedMovies }
-        : {
-            movies: [],
-            message: "No movies found matching the specified filters.",
-          }
-    );
+    // Return formatted movies or an empty result message
+    if (formattedMovies.length > 0) {
+      return res.status(200).json({ movies: formattedMovies });
+    } else {
+      return res.status(200).json({
+        movies: [],
+        message: "No movies found matching the specified filters.",
+      });
+    }
   } catch (error) {
     console.error("Failed to search movies by genre, actor, and director:", {
       genre,
@@ -101,7 +97,7 @@ const searchMovieByGenreActorAndDirector = async (req, res) => {
       listType,
       error,
     });
-    res.status(500).json({
+    return res.status(500).json({
       error: "An error occurred while searching for movies.",
     });
   }
